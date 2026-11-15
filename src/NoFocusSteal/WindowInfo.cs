@@ -1,0 +1,123 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+
+namespace NoFocusSteal;
+
+/// <summary>A snapshot of a window and the process that owns it, taken the moment it grabbed the foreground
+/// (short-lived focus stealers are often gone a few milliseconds later).</summary>
+internal sealed class WindowInfo
+{
+    // Parts of the Windows shell that legitimately take focus when you open them.
+    private static readonly HashSet<string> SystemProcesses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "StartMenuExperienceHost.exe", "SearchHost.exe", "SearchApp.exe", "SearchUI.exe",
+        "ShellExperienceHost.exe", "ShellHost.exe", "LockApp.exe", "LogonUI.exe", "consent.exe",
+        "TextInputHost.exe", "ScreenClippingHost.exe", "CredentialUIBroker.exe",
+    };
+
+    private static readonly HashSet<string> SystemExplorerClasses = new(StringComparer.Ordinal)
+    {
+        "Shell_TrayWnd", "Shell_SecondaryTrayWnd", "TaskListThumbnailWnd", "TaskSwitcherWnd", "MultitaskingViewFrame",
+        "XamlExplorerHostIslandWindow", "ForegroundStaging", "NotifyIconOverflowWindow",
+        "TopLevelWindowForOverflowXamlIsland", "Windows.UI.Core.CoreWindow", "#32768",
+        "DV2ControlHost", // classic Start menu (also drawn by StartAllBack / StartIsBack)
+    };
+
+    // Helper windows that exist only to host input-method UI. They should never be the foreground window,
+    // but a Windows 11 24H2 regression hands focus to explorer.exe's one after clicks, knocking games out.
+    private static readonly HashSet<string> BogusClasses = new(StringComparer.Ordinal) { "MSCTFIME UI", "IME" };
+
+    public IntPtr Hwnd;
+    public IntPtr RootOwner;
+    public uint ProcessId;
+    public string ExePath = "";
+    public string ExeName = "";
+    public string Title = "";
+    public string ClassName = "";
+    public bool Visible;
+    public int? ProcessStartTick;
+    /// <summary>The process runs as administrator (or higher), so a normal process can't see input sent to it.</summary>
+    public bool Elevated;
+
+    public bool IsSystemUI =>
+        SystemProcesses.Contains(ExeName)
+        || (ExeName.Equals("explorer.exe", StringComparison.OrdinalIgnoreCase) && SystemExplorerClasses.Contains(ClassName));
+
+    public bool IsBogus => BogusClasses.Contains(ClassName);
+
+    public string Describe() => string.IsNullOrEmpty(Title) ? $"[{ClassName}]" : Title;
+
+    public static WindowInfo Capture(IntPtr hwnd)
+    {
+        var info = new WindowInfo
+        {
+            Hwnd = hwnd,
+            RootOwner = Native.GetAncestor(hwnd, Native.GA_ROOTOWNER),
+            Visible = Native.IsWindowVisible(hwnd),
+        };
+
+        var sb = new StringBuilder(512);
+        if (Native.GetWindowText(hwnd, sb, sb.Capacity) > 0) info.Title = sb.ToString();
+        sb.Clear();
+        if (Native.GetClassName(hwnd, sb, sb.Capacity) > 0) info.ClassName = sb.ToString();
+
+        Native.GetWindowThreadProcessId(hwnd, out info.ProcessId);
+        IntPtr process = Native.OpenProcess(Native.PROCESS_QUERY_LIMITED_INFORMATION, false, info.ProcessId);
+        if (process != IntPtr.Zero)
+        {
+            try
+            {
+                sb.Clear();
+                uint len = (uint)sb.Capacity;
+                if (Native.QueryFullProcessImageName(process, 0, sb, ref len))
+                {
+                    info.ExePath = sb.ToString();
+                    info.ExeName = Path.GetFileName(info.ExePath);
+                }
+                info.Elevated = IsElevated(process);
+                if (Native.GetProcessTimes(process, out long creation, out _, out _, out _) && creation > 0)
+                {
+                    double ageMs = (DateTime.UtcNow - DateTime.FromFileTimeUtc(creation)).TotalMilliseconds;
+                    if (ageMs >= 0 && ageMs < int.MaxValue / 2)
+                        info.ProcessStartTick = unchecked(Environment.TickCount - (int)ageMs);
+                }
+            }
+            finally
+            {
+                Native.CloseHandle(process);
+            }
+        }
+        if (info.ExeName.Length == 0) info.ExeName = info.ProcessId == 4 || info.ProcessId == 0 ? "System" : $"PID {info.ProcessId}";
+        return info;
+    }
+
+    public static readonly bool SelfElevated = IsElevated(System.Diagnostics.Process.GetCurrentProcess().Handle);
+
+    private static bool IsElevated(IntPtr process)
+    {
+        // A token we aren't allowed to query belongs to a more privileged process, which is what matters here.
+        if (!Native.OpenProcessToken(process, Native.TOKEN_QUERY, out IntPtr token)) return true;
+        try
+        {
+            return Native.GetTokenInformation(token, Native.TokenElevation, out int elevated, sizeof(int), out _) && elevated != 0;
+        }
+        finally
+        {
+            Native.CloseHandle(token);
+        }
+    }
+
+    /// <summary>True if the window no longer exists, is hidden, minimized or cloaked (e.g. on another virtual desktop).</summary>
+    public static bool IsGone(IntPtr hwnd) => !IsUsable(hwnd);
+
+    /// <summary>True if the window exists, is visible, and is not minimized or cloaked.</summary>
+    public static bool IsUsable(IntPtr hwnd)
+    {
+        if (!Native.IsWindow(hwnd) || !Native.IsWindowVisible(hwnd) || Native.IsIconic(hwnd)) return false;
+        if (Native.DwmGetWindowAttribute(hwnd, Native.DWMWA_CLOAKED, out int cloaked, sizeof(int)) == 0 && cloaked != 0)
+            return false;
+        return true;
+    }
+}

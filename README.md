@@ -1,6 +1,6 @@
 # NoFocusSteal-LoL
 
-[NoFocusSteal](https://github.com/BoazCohenJ/NoFocusSteal) 1.4.0 的分支（MIT），当前版本 **1.4.0.3**。
+[NoFocusSteal](https://github.com/BoazCohenJ/NoFocusSteal) 1.4.0 的分支（MIT），当前版本 **1.4.0.4**。
 
 这不是官方项目。原作者是 [BoazCohenJ](https://github.com/BoazCohenJ)。本仓库只在官方 1.4.0 上加了英雄联盟「游戏 / 大厅」两套客户端的焦点规则：不向游戏或大厅注入代码。
 
@@ -54,6 +54,7 @@ dotnet build src/NoFocusSteal -c Release
 - **1.4.0.1**：大厅不再因为普通按键（包括 Enter）就自动允许；只有点击大厅、Alt/Win、刚离开对局，或从 WeGame / 启动闪屏打开时，才让大厅到前台。
 - **1.4.0.2**：任务栏 / 缩略图 / Alt+Tab 的点击如果能对上大厅名称，也算你要打开大厅；允许名单里的程序不能在大厅还在前台时自行把大厅挤走。
 - **1.4.0.3**：离开大厅必须是大厅已经到前台之后的点击、任务栏切换或 Alt/Win；过期的点击和残留按键作废。大厅窗口还在时，不把一次短暂隐藏或重建当成你离开了大厅。你真正最小化或关掉大厅后，仍然会让出焦点。
+- **1.4.0.4**：只要你不在大厅里，大厅就不能自己抢到前台。只有你主动点大厅（或任务栏 / Alt+Tab / Alt / Win）、刚从对局里出来（即使先闪到 WeGame「其他」页面）、或从 WeGame 打开时才放行。远程软件或游戏把鼠标抓住、藏起光标时，不会再把停在大厅上的残留光标当成你点了大厅。
 
 ## License
 

@@ -533,4 +533,26 @@ public class FocusPolicyTests
         Assert.Equal(Verdict.Allowed, d.Verdict);
         Assert.Equal("previous window was closed or minimized", d.Reason);
     }
+
+    [Fact]
+    public void LobbyMayComeForwardAfterLeavingAMatchEvenIfAnotherPageCameFirst()
+    {
+        // After a match, WeGame's "other" page can flash first; the lobby should still be allowed.
+        var s = LobbySteal(lastIntentAgo: 20000);
+        s.PreviousWasGame = false;
+        s.LeftGameRecently = true;
+        var d = Decide(s, ProtectionMode.Strict);
+        Assert.Equal(Verdict.Allowed, d.Verdict);
+        Assert.Equal("you just left a match", d.Reason);
+    }
+
+    [Fact]
+    public void LobbyIsBlockedWhenItRestartsWhileYouAreInAnotherApp()
+    {
+        var s = LobbySteal(lastIntentAgo: 20000);
+        s.NextProcessStart = Now - 500;
+        var d = Decide(s, ProtectionMode.Strict);
+        Assert.Equal(Verdict.Blocked, d.Verdict);
+        Assert.Equal("app is on your block list", d.Reason);
+    }
 }

@@ -181,7 +181,8 @@ internal sealed class InputTracker : NativeWindow, IDisposable
                 if (Native.GetCursorPos(out Native.POINT cursor))
                 {
                     IntPtr under = Native.WindowFromPoint(cursor);
-                    if (under != IntPtr.Zero) clicked = Native.GetAncestor(under, Native.GA_ROOTOWNER);
+                    IntPtr foreground = Native.GetForegroundWindow();
+                    clicked = ClickTarget.ResolveFromDesktop(under, foreground);
                     if (SwitcherClick.IsSwitcherWindow(under) || SwitcherClick.IsSwitcherWindow(clicked)
                         || SwitcherClick.IsPointOnTaskbar(cursor))
                         switcherName = SwitcherClick.NameAt(cursor) ?? "";

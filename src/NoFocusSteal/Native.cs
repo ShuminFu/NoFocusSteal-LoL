@@ -280,4 +280,36 @@ internal static class Native
     public static extern int AccessibleObjectFromPoint(POINT pt,
         [MarshalAs(UnmanagedType.Interface)] out object accessible,
         [MarshalAs(UnmanagedType.Struct)] out object child);
+
+    public const uint CURSOR_SHOWING = 0x00000001;
+    public const uint CURSOR_SUPPRESSED = 0x00000002;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct CURSORINFO
+    {
+        public int cbSize;
+        public uint flags;
+        public IntPtr hCursor;
+        public POINT ptScreenPos;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern bool GetCursorInfo(ref CURSORINFO info);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct GUITHREADINFO
+    {
+        public uint cbSize;
+        public uint flags;
+        public IntPtr hwndActive;
+        public IntPtr hwndFocus;
+        public IntPtr hwndCapture;
+        public IntPtr hwndMenuOwner;
+        public IntPtr hwndMoveSize;
+        public IntPtr hwndCaret;
+        public RECT rcCaret;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO info);
 }

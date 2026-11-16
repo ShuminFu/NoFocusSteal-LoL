@@ -230,8 +230,10 @@ public static class FocusPolicy
     }
 
     /// <summary>
-    /// The League lobby may come forward after a match, when you click it, when you Alt/Win-switch to it,
-    /// or when you open it from WeGame. A click or Enter in some other app is not enough.
+    /// The League lobby may come forward after a match (including a brief hop through WeGame's
+    /// "other" page), when you click it, when you Alt/Win-switch to it, or when you open it from
+    /// WeGame. Being in another app, including a remote-control window, is not enough, even if
+    /// the leftover cursor is still sitting over the lobby.
     /// </summary>
     private static bool LobbyMayComeForward(FocusSnapshot s, PolicyOptions o, bool clicking, bool recentIntent)
     {

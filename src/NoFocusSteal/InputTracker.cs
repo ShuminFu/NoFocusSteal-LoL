@@ -183,8 +183,10 @@ internal sealed class InputTracker : NativeWindow, IDisposable
                     IntPtr under = Native.WindowFromPoint(cursor);
                     IntPtr foreground = Native.GetForegroundWindow();
                     clicked = ClickTarget.ResolveFromDesktop(under, foreground);
-                    if (SwitcherClick.IsSwitcherWindow(under) || SwitcherClick.IsSwitcherWindow(clicked)
-                        || SwitcherClick.IsPointOnTaskbar(cursor))
+                    // Only the resolved target counts: a leftover cursor sitting on the
+                    // lobby's taskbar button must not tag a click that actually went to
+                    // Chrome, Grok Bot, or another app as a switcher click.
+                    if (SwitcherClick.IsSwitcherWindow(clicked))
                         switcherName = SwitcherClick.NameAt(cursor) ?? "";
                 }
                 _clickWindows[_clickNext] = clicked;

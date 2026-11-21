@@ -209,12 +209,21 @@ internal static class SwitcherClick
     private static bool ContainsIgnoreCase(string haystack, string needle) =>
         haystack.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0;
 
+    internal static bool RectContains(double left, double top, double width, double height, int x, int y) =>
+        width > 0 && height > 0
+        && x >= left && x < left + width
+        && y >= top && y < top + height;
+
     private static string NameFromUia(Native.POINT pt)
     {
         try
         {
             var el = AutomationElement.FromPoint(new System.Windows.Point(pt.X, pt.Y));
-            return BestUiaName(el, pt, 0);
+            if (el == null || !ElementContainsPoint(el, pt)) return null;
+            string best = null;
+            double bestArea = double.PositiveInfinity;
+            CollectSmallestUiaName(el, pt, 0, ref best, ref bestArea);
+            return best;
         }
         catch
         {
@@ -222,39 +231,51 @@ internal static class SwitcherClick
         }
     }
 
-    private static string BestUiaName(AutomationElement el, Native.POINT pt, int depth)
+    private static void CollectSmallestUiaName(AutomationElement el, Native.POINT pt, int depth,
+        ref string best, ref double bestArea)
     {
-        if (el == null || depth > 8) return null;
+        if (el == null || depth > 8) return;
+        if (!ElementContainsPoint(el, pt, out double area)) return;
 
         string own = FirstUsable(SafeUiaString(() => el.Current.Name),
                                  SafeUiaString(() => el.Current.HelpText));
-        if (own != null) return own;
+        if (own != null && area < bestArea)
+        {
+            best = own;
+            bestArea = area;
+        }
 
         AutomationElement child;
         try { child = TreeWalker.RawViewWalker.GetFirstChild(el); }
-        catch { return null; }
+        catch { return; }
 
         while (child != null)
         {
-            try
-            {
-                var r = child.Current.BoundingRectangle;
-                if (!r.IsEmpty && r.Width > 0 && r.Height > 0
-                    && pt.X >= r.Left && pt.X < r.Right && pt.Y >= r.Top && pt.Y < r.Bottom)
-                {
-                    string inner = BestUiaName(child, pt, depth + 1);
-                    if (inner != null) return inner;
-                }
-            }
-            catch
-            {
-                // Keep walking siblings if one child is stale.
-            }
-
+            try { CollectSmallestUiaName(child, pt, depth + 1, ref best, ref bestArea); }
+            catch { }
             try { child = TreeWalker.RawViewWalker.GetNextSibling(child); }
             catch { break; }
         }
-        return null;
+    }
+
+    private static bool ElementContainsPoint(AutomationElement el, Native.POINT pt) =>
+        ElementContainsPoint(el, pt, out _);
+
+    private static bool ElementContainsPoint(AutomationElement el, Native.POINT pt, out double area)
+    {
+        area = 0;
+        try
+        {
+            var r = el.Current.BoundingRectangle;
+            if (r.IsEmpty || !RectContains(r.Left, r.Top, r.Width, r.Height, pt.X, pt.Y))
+                return false;
+            area = r.Width * r.Height;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string FirstUsable(params string[] names)

@@ -152,12 +152,12 @@ public static class FocusPolicy
         if (s.NextIsLobby && lobbyOk)
         {
             if (s.LeftGameRecently || s.PreviousWasGame) return Allow("you just left a match");
-            if (s.LastClickOnNext.HasValue && Elapsed(s.EventTime, s.LastClickOnNext.Value) <= o.IntentWindowMs)
-                return Allow("follows your click or keypress");
-            if (s.LastSwitchKey.HasValue && Elapsed(s.EventTime, s.LastSwitchKey.Value) <= o.IntentWindowMs)
-                return Allow("follows your click or keypress");
+            if (UnusedByPreviousClick(s, o, s.LastClickOnNext))
+                return Allow("follows your click");
+            if (UnusedByPreviousClick(s, o, s.LastSwitchKey))
+                return Allow("follows your Alt or Win key");
             if (SwitcherClickForNext(s, o))
-                return Allow("follows your click or keypress");
+                return Allow("follows your taskbar or tray click");
             if (s.PreviousGone) return Allow("previous window was closed or minimized");
             if (launchedByYou) return Allow("an app you just launched");
             return Allow("follows your click or keypress");
@@ -239,11 +239,28 @@ public static class FocusPolicy
     {
         if (!s.NextIsLobby) return true;
         if (s.LeftGameRecently || s.PreviousWasGame) return true;
-        if (s.LastClickOnNext.HasValue && Elapsed(s.EventTime, s.LastClickOnNext.Value) <= o.IntentWindowMs) return true;
-        if (s.LastSwitchKey.HasValue && Elapsed(s.EventTime, s.LastSwitchKey.Value) <= o.IntentWindowMs) return true;
+        if (UnusedByPreviousClick(s, o, s.LastClickOnNext)) return true;
+        if (UnusedByPreviousClick(s, o, s.LastSwitchKey)) return true;
         if (SwitcherClickForNext(s, o)) return true;
         if (s.PreviousWasLobbyLauncher && (s.PreviousGone || clicking || recentIntent)) return true;
         return false;
+    }
+
+    /// <summary>
+    /// True when <paramref name="intent"/> is recent, and you have not since (or at the
+    /// same moment) clicked in the window you are already in. A click in Chrome, Grok Bot
+    /// or another app must not also be treated as asking for the lobby, even if a leftover
+    /// cursor was sitting on the lobby's taskbar button at that moment.
+    /// </summary>
+    private static bool UnusedByPreviousClick(FocusSnapshot s, PolicyOptions o, int? intent)
+    {
+        if (!intent.HasValue) return false;
+        if (Elapsed(s.EventTime, intent.Value) > o.IntentWindowMs) return false;
+        if (s.LastClickInPrevious.HasValue
+            && Elapsed(s.EventTime, s.LastClickInPrevious.Value) <= o.IntentWindowMs
+            && Elapsed(s.LastClickInPrevious.Value, intent.Value) >= 0)
+            return false;
+        return true;
     }
 
     /// <summary>The lobby is the window losing focus, or a lobby window is still up.</summary>
@@ -276,9 +293,7 @@ public static class FocusPolicy
     }
 
     private static bool SwitcherClickForNext(FocusSnapshot s, PolicyOptions o) =>
-        s.SwitcherTargetsNext
-        && s.LastClickOnSwitcher.HasValue
-        && Elapsed(s.EventTime, s.LastClickOnSwitcher.Value) <= o.IntentWindowMs;
+        s.SwitcherTargetsNext && UnusedByPreviousClick(s, o, s.LastClickOnSwitcher);
 
     /// <summary>The new window's process started no earlier than a second before <paramref name="action"/>,
     /// and not too long ago: something that action launched.</summary>

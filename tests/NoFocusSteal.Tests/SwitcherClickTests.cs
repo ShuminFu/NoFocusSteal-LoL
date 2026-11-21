@@ -99,4 +99,17 @@ public class SwitcherClickTests
         Assert.False(SwitcherClick.Matches("Pallas", "League of Legends", "LeagueClientUx.exe"));
         Assert.False(SwitcherClick.Matches("腾讯游戏平台", "League of Legends", "LeagueClientUx.exe"));
     }
+
+    [Fact]
+    public void PointInChromeDoesNotHitATaskbarButtonRect()
+    {
+        // Taskbar button along the bottom; a click in the Chrome window above it
+        // must not be treated as a hit on that button, even if the button is named
+        // 英雄联盟 / League of Legends.
+        const int buttonLeft = 100, buttonTop = 1040, buttonWidth = 80, buttonHeight = 40;
+        Assert.True(SwitcherClick.RectContains(buttonLeft, buttonTop, buttonWidth, buttonHeight, 140, 1050));
+        Assert.False(SwitcherClick.RectContains(buttonLeft, buttonTop, buttonWidth, buttonHeight, 140, 900));
+        Assert.False(SwitcherClick.RectContains(buttonLeft, buttonTop, buttonWidth, buttonHeight, 140, 1039));
+        Assert.False(SwitcherClick.RectContains(buttonLeft, buttonTop, buttonWidth, buttonHeight, 99, 1050));
+    }
 }

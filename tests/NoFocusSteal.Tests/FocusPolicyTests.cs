@@ -413,7 +413,7 @@ public class FocusPolicyTests
         s.SwitcherTargetsNext = true;
         var d = Decide(s, ProtectionMode.Strict);
         Assert.Equal(Verdict.Allowed, d.Verdict);
-        Assert.Equal("follows your click or keypress", d.Reason);
+        Assert.Equal("follows your taskbar or tray click", d.Reason);
     }
 
     [Fact]
@@ -426,7 +426,56 @@ public class FocusPolicyTests
         s.SwitcherTargetsNext = true;
         var d = Decide(s, ProtectionMode.Strict);
         Assert.Equal(Verdict.Allowed, d.Verdict);
-        Assert.Equal("follows your click or keypress", d.Reason);
+        Assert.Equal("follows your taskbar or tray click", d.Reason);
+    }
+
+    [Fact]
+    public void LobbyIsBlockedWhenAClickInChromeAlsoSawTheLobbyTaskbarName()
+    {
+        // A leftover cursor on the always-visible「英雄联盟」taskbar button must
+        // not turn a click that went to Chrome into lobby intent.
+        var s = LobbySteal(lastIntentAgo: 20000);
+        s.LastClickInPrevious = Now - 80;
+        s.LastClickOnSwitcher = Now - 80;
+        s.SwitcherTargetsNext = true;
+        var d = Decide(s, ProtectionMode.Strict);
+        Assert.Equal(Verdict.Blocked, d.Verdict);
+        Assert.Equal("app is on your block list", d.Reason);
+    }
+
+    [Fact]
+    public void LobbyIsBlockedWhenYouClickChromeAfterItsTaskbarButton()
+    {
+        var s = LobbySteal(lastIntentAgo: 80);
+        s.LastClickOnSwitcher = Now - 200;
+        s.SwitcherTargetsNext = true;
+        s.LastClickInPrevious = Now - 80;
+        var d = Decide(s, ProtectionMode.Strict);
+        Assert.Equal(Verdict.Blocked, d.Verdict);
+        Assert.Equal("app is on your block list", d.Reason);
+    }
+
+    [Fact]
+    public void LobbyIsBlockedWhenALobbyClickIsFollowedByAClickInChrome()
+    {
+        var s = LobbySteal(lastIntentAgo: 20000);
+        s.LastClickOnNext = Now - 200;
+        s.LastClickInPrevious = Now - 80;
+        var d = Decide(s, ProtectionMode.Strict);
+        Assert.Equal(Verdict.Blocked, d.Verdict);
+        Assert.Equal("app is on your block list", d.Reason);
+    }
+
+    [Fact]
+    public void AnOldClickInChromeDoesNotBlockALaterLobbyTaskbarClick()
+    {
+        var s = LobbySteal(lastIntentAgo: 80);
+        s.LastClickInPrevious = Now - 2000;
+        s.LastClickOnSwitcher = Now - 80;
+        s.SwitcherTargetsNext = true;
+        var d = Decide(s, ProtectionMode.Strict);
+        Assert.Equal(Verdict.Allowed, d.Verdict);
+        Assert.Equal("follows your taskbar or tray click", d.Reason);
     }
 
     [Fact]

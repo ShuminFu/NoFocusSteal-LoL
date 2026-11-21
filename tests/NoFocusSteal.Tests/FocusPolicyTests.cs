@@ -417,6 +417,19 @@ public class FocusPolicyTests
     }
 
     [Fact]
+    public void LobbyMayComeForwardWhenYouClickItsTrayOrOverflowIcon()
+    {
+        // Same switcher path as a taskbar button: the click is on explorer's
+        // tray / overflow, previous focus can still be logged as Grok Bot.
+        var s = LobbySteal(lastIntentAgo: 80);
+        s.LastClickOnSwitcher = Now - 80;
+        s.SwitcherTargetsNext = true;
+        var d = Decide(s, ProtectionMode.Strict);
+        Assert.Equal(Verdict.Allowed, d.Verdict);
+        Assert.Equal("follows your click or keypress", d.Reason);
+    }
+
+    [Fact]
     public void LobbyIsBlockedWhenTaskbarClickWasForAnotherApp()
     {
         var s = LobbySteal(lastIntentAgo: 80);
